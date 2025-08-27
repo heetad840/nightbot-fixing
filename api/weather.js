@@ -1,34 +1,35 @@
-import axios from "axios";
-
 export default async function handler(req, res) {
-  const { location } = req.query;
-  const apiKey = process.env.WEATHER_API_KEY;
-
-  if (!location) {
-    return res.status(400).send("กรุณาระบุชื่อจังหวัด เช่น ?location=เชียงใหม่");
-  }
-
   try {
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
-      location
-    )},TH&units=metric&lang=th&appid=${apiKey}`;
-    const response = await axios.get(url);
-    const data = response.data;
+    const city = req.query.city || "Bangkok";
+    const apiKey = process.env.OPENWEATHER_API_KEY;
 
-    const weather = data.weather[0].description;
-    const temp = data.main.temp;
+    if (!apiKey) {
+      return res.status(500).json({ error: "❌ ไม่พบ API KEY กรุณาตั้งค่าใน Vercel" });
+    }
 
-    // emoji อัตโนมัติ
-    let emoji = "🌤️";
-    if (weather.includes("ฝน")) emoji = "🌧️";
-    else if (weather.includes("เมฆ")) emoji = "☁️";
-    else if (weather.includes("หิมะ")) emoji = "❄️";
-    else if (weather.includes("ฟ้าใส") || weather.includes("แดด")) emoji = "☀️";
-
-    res.status(200).send(
-      `${emoji} สภาพอากาศที่ ${location} ตอนนี้: ${weather}, อุณหภูมิ ${temp}°C`
+    const response = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=th`
     );
+    const data = await response.json();
+
+    if (response.ok) {
+      const weather = data.weather[0].main.toLowerCase();
+      let emoji = "🌍";
+
+      if (weather.includes("clear")) emoji = "☀️";
+      else if (weather.includes("cloud")) emoji = "☁️";
+      else if (weather.includes("rain")) emoji = "🌧️";
+      else if (weather.includes("storm") || weather.includes("thunder")) emoji = "⛈️";
+      else if (weather.includes("snow")) emoji = "❄️";
+      else if (weather.includes("mist") || weather.includes("fog")) emoji = "🌫️";
+
+      return res.status(200).json({
+        ข้อความ: `📍 จังหวัด: ${data.name}\n🌡️ อุณหภูมิ: ${data.main.temp}°C\nสภาพอากาศ: ${data.weather[0].description} ${emoji}`,
+      });
+    } else {
+      return res.status(500).json({ error: `⚠️ เกิดข้อผิดพลาด: ${data.message}` });
+    }
   } catch (err) {
-    res.status(500).send("ไม่พบข้อมูลสภาพอากาศสำหรับจังหวัดนี้");
+    return res.status(500).json({ error: `💥 ขัดข้อง: ${err.message}` });
   }
 }
